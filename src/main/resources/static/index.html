@@ -211,7 +211,7 @@
     }
     .add-friend button:hover:not(:disabled) { transform: translateY(-2px); }
     .add-friend button:disabled { opacity: .6; cursor: not-allowed; }
-    .search-result { margin: -8px 0 22px; }
+    .search-result { display: flex; flex-direction: column; gap: 10px; margin: -8px 0 22px; }
     .search-hint { color: var(--text-dim); font-size: 13px; padding: 6px 2px; }
 
     .req-actions { display: flex; gap: 8px; flex-shrink: 0; }
@@ -292,7 +292,7 @@
   <!-- ===== Tìm & thêm bạn ===== -->
   <div class="section-title" style="margin-top: 36px;">Tìm &amp; thêm bạn</div>
   <div class="add-friend">
-    <input id="searchInput" placeholder="Nhập chính xác username…" autocomplete="off">
+    <input id="searchInput" placeholder="Tìm theo tên hoặc username…" autocomplete="off">
     <button id="searchBtn">Tìm</button>
   </div>
   <div id="searchResult" class="search-result"></div>
@@ -537,9 +537,8 @@
     try {
       const res = await Auth.apiFetch('/api/users/search?username=' + encodeURIComponent(q));
       if (res.status === 403) { Auth.logout(); return; }
-      if (res.status === 404) { searchHint('Không tìm thấy ai có username “' + q + '”.'); return; }
       if (!res.ok) throw new Error('HTTP ' + res.status);
-      renderSearchResult(await res.json());
+      renderSearchResults(await res.json(), q);
     } catch (e) {
       searchHint('Có lỗi khi tìm kiếm. Thử lại sau.');
     } finally { searchBtn.disabled = false; }
@@ -549,8 +548,14 @@
     const d = document.createElement('div'); d.className = 'search-hint'; d.textContent = text;
     searchResult.appendChild(d);
   }
-  function renderSearchResult(u) {
+  function renderSearchResults(list, q) {
     searchResult.innerHTML = '';
+    if (!Array.isArray(list) || !list.length) { searchHint('Không tìm thấy ai khớp “' + q + '”.'); return; }
+    const frag = document.createDocumentFragment();
+    list.forEach(u => frag.appendChild(searchRow(u)));
+    searchResult.appendChild(frag);
+  }
+  function searchRow(u) {
     const row = document.createElement('div'); row.className = 'person';
     const [avatar, meta] = avatarMeta(u.displayName, u.username);
     const actions = document.createElement('div'); actions.className = 'req-actions';
@@ -565,7 +570,7 @@
     }
     actions.append(btn);
     row.append(avatar, meta, actions);
-    searchResult.appendChild(row);
+    return row;
   }
 
   searchBtn.onclick = () => doSearch();

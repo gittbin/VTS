@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/users")
 public class UserController {
@@ -27,11 +29,11 @@ public class UserController {
     }
 
     /**
-     * Tìm người để kết bạn bằng username CHÍNH XÁC.
-     * Cố ý KHÔNG có endpoint liệt kê toàn bộ user (tránh enumeration — xem THIET-KE-FRIEND-ONLY §7).
+     * Tìm người để kết bạn theo username HOẶC tên hiển thị (khớp một phần, tối đa 10 kết quả).
+     * Vẫn KHÔNG có endpoint liệt kê toàn bộ user; kết quả bị giới hạn để hạn chế enumeration.
      */
     @GetMapping("/search")
-    public UserSearchResponse search(@RequestParam String username, Authentication authentication) {
+    public List<UserSearchResponse> search(@RequestParam String username, Authentication authentication) {
         return userService.search(authentication.getName(), username);
     }
 }

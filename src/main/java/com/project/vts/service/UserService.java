@@ -8,6 +8,8 @@ import com.project.vts.model.User;
 import com.project.vts.repository.UserRepository;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 public class UserService {
 
@@ -27,13 +29,13 @@ public class UserService {
     }
 
     /**
-     * Tìm 1 người để kết bạn theo username chính xác (mô hình friends-only — KHÔNG liệt kê toàn bộ user).
+     * Tìm người để kết bạn theo username HOẶC tên hiển thị (khớp một phần, tối đa 10).
      * Trả kèm quan hệ hiện tại để UI hiển thị đúng nút.
      */
-    public UserSearchResponse search(String currentUsername, String targetUsername) {
+    public List<UserSearchResponse> search(String currentUsername, String query) {
         User me = userRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> new BadRequestException("Phiên đăng nhập không hợp lệ"));
-        return friendshipService.search(me.getId(), targetUsername);
+        return friendshipService.search(me.getId(), query);
     }
 
     private UserResponse toResponse(User u) {

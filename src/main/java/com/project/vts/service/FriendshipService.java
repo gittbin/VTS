@@ -158,12 +158,19 @@ public class FriendshipService {
                 .toList();
     }
 
-    /** Tìm 1 người theo username chính xác + quan hệ hiện tại với người tìm. 404 nếu không có. */
-    public UserSearchResponse search(String currentUserId, String username) {
-        User u = userRepository.findByUsername(username)
-                .orElseThrow(() -> new NotFoundException("Không tìm thấy người dùng @" + username));
-        return new UserSearchResponse(u.getId(), u.getUsername(), u.getDisplayName(),
-                relationshipBetween(currentUserId, u.getId()));
+    /**
+     * Tìm người để kết bạn theo username HOẶC tên hiển thị (khớp một phần, không phân biệt hoa/thường,
+     * tối đa 10 kết quả). Loại chính mình, kèm quan hệ hiện tại để UI hiển thị đúng nút.
+     */
+    public List<UserSearchResponse> search(String currentUserId, String query) {
+        String q = query == null ? "" : query.trim();
+        if (q.isEmpty()) return List.of();
+        return userRepository
+                .findTop10ByUsernameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase(q, q).stream()
+                .filter(u -> !u.getId().equals(currentUserId))
+                .map(u -> new UserSearchResponse(u.getId(), u.getUsername(), u.getDisplayName(),
+                        relationshipBetween(currentUserId, u.getId())))
+                .toList();
     }
 
     // ---------- Dùng cho tầng signaling ----------
