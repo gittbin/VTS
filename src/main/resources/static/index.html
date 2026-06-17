@@ -1,0 +1,425 @@
+<!-- src/main/resources/static/index.html -->
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VTS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #15110E; --surface: #1E1916; --surface-2: #2A2219; --border: #3A2F25;
+      --text: #F3EAE0; --text-dim: #A89A8B; --accent: #FF7A5C; --accent-2: #FFB14E; --ok: #5BD18B;
+      --danger: #FF5A52;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); color: var(--text);
+      min-height: 100vh; position: relative;
+    }
+    body::before {
+      content: ''; position: fixed; inset: 0; z-index: 0;
+      background: radial-gradient(700px circle at 85% 0%, rgba(255,122,92,0.10), transparent 60%);
+    }
+    header {
+      position: relative; z-index: 1;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 18px 28px; border-bottom: 1px solid var(--border);
+      background: rgba(21,17,14,0.7); backdrop-filter: blur(10px);
+    }
+    .brand { display: flex; align-items: center; gap: 11px; }
+    .mark {
+      width: 36px; height: 36px; border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      display: grid; place-items: center;
+    }
+    .mark svg { width: 19px; height: 19px; }
+    .brand h1 { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 21px; letter-spacing: -0.4px; }
+    .user-chip { display: flex; align-items: center; gap: 12px; }
+    .avatar {
+      width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #2A1206;
+      font-weight: 700; font-size: 15px;
+    }
+    .user-chip .name { font-weight: 600; font-size: 14px; }
+    .logout {
+      background: var(--surface-2); border: 1px solid var(--border); color: var(--text-dim);
+      padding: 8px 14px; border-radius: 9px; cursor: pointer; font-family: inherit; font-size: 13px;
+      font-weight: 600; transition: all .2s;
+    }
+    .logout:hover { color: var(--text); border-color: var(--accent); }
+
+    main { position: relative; z-index: 1; max-width: 760px; margin: 0 auto; padding: 40px 28px; }
+    .self {
+      display: flex; align-items: center; gap: 20px;
+      background: linear-gradient(180deg, var(--surface), #1B1613);
+      border: 1px solid var(--border); border-radius: 20px; padding: 28px; margin-bottom: 36px;
+      animation: rise .6s ease both;
+    }
+    @keyframes rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+    .self .avatar-lg {
+      width: 76px; height: 76px; border-radius: 50%; display: grid; place-items: center;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #2A1206;
+      font-weight: 800; font-size: 30px; font-family: 'Bricolage Grotesque', sans-serif;
+    }
+    .self .display { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 24px; }
+    .self .uname { color: var(--text-dim); font-size: 14px; margin-top: 2px; }
+    .status { display: inline-flex; align-items: center; gap: 7px; margin-top: 10px;
+      font-size: 13px; color: var(--ok); font-weight: 600; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 4px rgba(91,209,139,0.18); }
+
+    .section-title { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700;
+      font-size: 17px; margin-bottom: 16px; }
+    .empty {
+      border: 1px dashed var(--border); border-radius: 18px; padding: 44px 28px; text-align: center;
+      animation: rise .6s ease .1s both;
+    }
+    .empty .icon {
+      width: 52px; height: 52px; margin: 0 auto 16px; border-radius: 14px;
+      background: var(--surface-2); display: grid; place-items: center; color: var(--accent);
+    }
+    .empty h3 { font-weight: 700; font-size: 16px; margin-bottom: 8px; }
+    .empty p { color: var(--text-dim); font-size: 14px; line-height: 1.6; max-width: 420px; margin: 0 auto; }
+
+    /* ===== Danh sách "Mọi người" ===== */
+    .section-hint { color: var(--text-dim); font-size: 12.5px; margin: -8px 0 16px; line-height: 1.5; }
+    .people-list { display: flex; flex-direction: column; gap: 10px; }
+    .person {
+      display: flex; align-items: center; gap: 16px;
+      background: linear-gradient(180deg, var(--surface), #1B1613);
+      border: 1px solid var(--border); border-radius: 16px; padding: 15px 18px;
+      animation: rise .5s ease both;
+    }
+    .person .avatar { width: 46px; height: 46px; font-size: 17px; flex-shrink: 0; }
+    .person .meta { flex: 1; min-width: 0; }
+    .person .meta .pname {
+      font-weight: 600; font-size: 15px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .person .meta .puname { color: var(--text-dim); font-size: 13px; margin-top: 2px; }
+    .pstatus { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; flex-shrink: 0; }
+    .pstatus .pdot { width: 8px; height: 8px; border-radius: 50%; }
+    .pstatus.on { color: var(--ok); }
+    .pstatus.on .pdot { background: var(--ok); box-shadow: 0 0 0 4px rgba(91,209,139,0.16); }
+    .pstatus.off { color: var(--text-dim); }
+    .pstatus.off .pdot { background: #5A4D40; }
+    .call-actions { display: flex; gap: 8px; flex-shrink: 0; }
+    .call-btn {
+      width: 42px; height: 42px; border-radius: 50%; border: 0; cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center;
+      transition: transform .15s, box-shadow .2s, background .2s, color .2s, border-color .2s;
+    }
+    .call-btn.video { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #2A1206; }
+    .call-btn.audio { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+    .call-btn:hover:not(:disabled) { transform: translateY(-2px); }
+    .call-btn.video:hover:not(:disabled) { box-shadow: 0 10px 24px -8px rgba(255,122,92,0.5); }
+    .call-btn.audio:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+    .call-btn:disabled { opacity: .4; cursor: not-allowed; }
+    @media (max-width: 520px) {
+      .person { gap: 12px; padding: 13px 15px; }
+      .pstatus .plabel { display: none; }   /* mobile: chỉ còn chấm trạng thái */
+    }
+    /* ===== Call overlay ===== */
+    .call-overlay { position: fixed; inset: 0; z-index: 1000; display: none; background: #0E0B09; overflow: hidden; }
+    .call-overlay.show { display: block; animation: fade .25s ease both; }
+    @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+    .remote-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #0E0B09; transition: opacity .3s; }
+    .call-stage-empty {
+      position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 14px;
+      background: radial-gradient(700px circle at 50% 30%, rgba(255,122,92,0.12), transparent 60%);
+    }
+    .big-avatar {
+      width: 116px; height: 116px; border-radius: 50%; display: grid; place-items: center;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #2A1206;
+      font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 46px;
+      box-shadow: 0 20px 60px -16px rgba(255,122,92,0.5); animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100% { box-shadow: 0 20px 60px -16px rgba(255,122,92,0.45); } 50% { box-shadow: 0 20px 84px -10px rgba(255,122,92,0.78); } }
+    .call-peer-name { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 24px; }
+    .call-status { color: var(--text-dim); font-size: 14px; }
+    .local-video {
+      position: absolute; top: 20px; right: 20px; z-index: 3; width: 168px; height: 116px; object-fit: cover;
+      border-radius: 14px; border: 1px solid rgba(255,255,255,0.15); background: #1B1613;
+      transform: scaleX(-1); box-shadow: 0 12px 30px -10px rgba(0,0,0,0.6);
+    }
+    .call-topbar { position: absolute; top: 22px; left: 24px; z-index: 3; display: flex; flex-direction: column; gap: 2px; text-shadow: 0 1px 6px rgba(0,0,0,0.6); }
+    .call-peer-name-top { font-weight: 700; font-size: 17px; }
+    .call-timer { font-size: 13px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+    .call-controls {
+      position: absolute; bottom: 34px; left: 50%; transform: translateX(-50%); z-index: 4;
+      display: flex; gap: 18px; padding: 14px 18px; border-radius: 20px;
+      background: rgba(20,16,13,0.6); backdrop-filter: blur(14px); border: 1px solid rgba(255,255,255,0.08);
+    }
+    .ctrl-btn { width: 56px; height: 56px; border-radius: 50%; border: 0; cursor: pointer; display: grid; place-items: center; color: var(--text); background: var(--surface-2); transition: transform .12s, background .2s; }
+    .ctrl-btn:hover { transform: translateY(-2px); }
+    .ctrl-btn.off { background: #4A3A2C; color: var(--text-dim); }
+    .ctrl-btn.end { background: var(--danger); color: #fff; }
+    .ctrl-btn.end svg { transform: rotate(135deg); }
+    .ctrl-btn.end:hover { background: #ff6b62; }
+    .incoming-modal { position: fixed; inset: 0; z-index: 1100; display: none; align-items: center; justify-content: center; padding: 24px; background: rgba(10,8,6,0.6); backdrop-filter: blur(6px); }
+    .incoming-modal.show { display: flex; animation: fade .2s ease both; }
+    .incoming-card { background: linear-gradient(180deg, var(--surface), #1B1613); border: 1px solid var(--border); border-radius: 24px; padding: 34px 30px; text-align: center; width: 100%; max-width: 340px; box-shadow: 0 40px 90px -30px rgba(0,0,0,0.8); animation: rise .4s cubic-bezier(.2,.8,.2,1) both; }
+    .incoming-avatar { width: 86px; height: 86px; border-radius: 50%; margin: 0 auto 16px; display: grid; place-items: center; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #2A1206; font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 34px; animation: pulse 1.6s ease-in-out infinite; }
+    .incoming-name { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 22px; }
+    .incoming-sub { color: var(--text-dim); font-size: 14px; margin-top: 4px; margin-bottom: 26px; }
+    .incoming-actions { display: flex; gap: 14px; }
+    .inc-btn { flex: 1; padding: 13px; border: 0; border-radius: 12px; cursor: pointer; font-family: inherit; font-weight: 700; font-size: 14px; transition: transform .12s; }
+    .inc-btn:hover { transform: translateY(-2px); }
+    .inc-btn.accept { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #2A1206; }
+    .inc-btn.reject { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+    @media (max-width: 520px) {
+      .local-video { width: 116px; height: 80px; top: 16px; right: 16px; }
+      .ctrl-btn { width: 52px; height: 52px; }
+      .ctrl-btn.active { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #2A1206; }
+    }
+    /* ===== Lịch sử cuộc gọi ===== */
+    .call-log { display: flex; flex-direction: column; gap: 8px; }
+    .log-item { display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border); }
+    .log-icon { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; background: var(--surface-2); color: var(--text-dim); }
+    .log-icon.missed { color: var(--danger); }
+    .log-meta { flex: 1; min-width: 0; }
+    .log-name { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .log-sub { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+    .log-sub.missed { color: var(--danger); }
+    .log-time { font-size: 12px; color: var(--text-dim); flex-shrink: 0; }
+  </style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="mark">
+      <svg viewBox="0 0 24 24" fill="none"><rect x="2.5" y="6" width="12" height="12" rx="3" fill="#2A1206"/><path d="M16 10.5L21 7.5V16.5L16 13.5V10.5Z" fill="#2A1206"/></svg>
+    </div>
+    <h1>VTS</h1>
+  </div>
+  <div class="user-chip">
+    <div class="avatar" id="navAvatar"></div>
+    <span class="name" id="navName"></span>
+    <button class="logout" onclick="Auth.logout()">Đăng xuất</button>
+  </div>
+</header>
+
+<main>
+  <div class="self">
+    <div class="avatar-lg" id="selfAvatar"></div>
+    <div>
+      <div class="display" id="selfName"></div>
+      <div class="uname" id="selfUname"></div>
+      <span class="status"><span class="dot"></span> Đang hoạt động</span>
+    </div>
+  </div>
+
+  <div class="section-title">Mọi người</div>
+  <p class="section-hint">Trạng thái trực tuyến sẽ cập nhật theo thời gian thực sau khi hoàn thiện phần signaling — hiện tại tạm hiển thị theo dữ liệu lần cuối.</p>
+
+  <div id="peopleList" class="people-list"></div>
+
+  <div id="peopleEmpty" class="empty" style="display:none">
+    <div class="icon">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+      </svg>
+    </div>
+    <h3>Chưa có ai khác ở đây</h3>
+    <p>Khi có thêm tài khoản đăng ký, mọi người sẽ xuất hiện ở đây. Rủ thêm bạn bè tạo tài khoản để thử gọi video nhé.</p>
+  </div>
+  <div class="section-title" style="margin-top: 36px;">Lịch sử cuộc gọi</div>
+  <div id="callLog" class="call-log"></div>
+  <div id="callLogEmpty" class="empty" style="display:none">
+    <h3>Chưa có cuộc gọi nào</h3>
+    <p>Lịch sử các cuộc gọi đi và đến sẽ xuất hiện ở đây.</p>
+  </div>
+</main>
+
+<script src="/js/auth.js"></script>
+<script src="/js/signaling.js"></script>
+<script src="/js/webrtc.js"></script>
+<script>
+  Auth.requireAuth();
+
+  function initialsOf(name) {
+    return (name || '?').trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  }
+
+  // ----- Thông tin của chính mình -----
+  const me = Auth.getUser();
+  const myInitials = initialsOf(me.displayName || me.username);
+  document.getElementById('navAvatar').textContent = myInitials;
+  document.getElementById('navName').textContent = me.displayName;
+  document.getElementById('selfAvatar').textContent = myInitials;
+  document.getElementById('selfName').textContent = me.displayName;
+  document.getElementById('selfUname').textContent = '@' + me.username;
+
+  // ----- Danh sách "Mọi người" + online realtime + nút Gọi -----
+  const peopleList = document.getElementById('peopleList');
+  const peopleEmpty = document.getElementById('peopleEmpty');
+  const onlinePeers = new Set();
+
+  function paintDot(row, online) {
+    const st = row.querySelector('.pstatus');
+    st.classList.toggle('on', online);
+    st.classList.toggle('off', !online);
+    row.querySelector('.plabel').textContent = online ? 'Đang hoạt động' : 'Ngoại tuyến';
+    row.querySelectorAll('.call-btn').forEach(b => b.disabled = !online);   // bật/tắt cả 2 nút gọi
+  }
+  function refreshAllDots() {
+    peopleList.querySelectorAll('.person').forEach(row => paintDot(row, onlinePeers.has(row.dataset.userId)));
+  }
+  function applyPresence(userId, online) {
+    if (online) onlinePeers.add(userId); else onlinePeers.delete(userId);
+    const row = peopleList.querySelector(`.person[data-user-id="${CSS.escape(userId)}"]`);
+    if (row) paintDot(row, online);
+  }
+
+  function personRow(u) {
+    const online = onlinePeers.has(u.id);
+    const row = document.createElement('div');
+    row.className = 'person';
+    row.dataset.userId = u.id;
+    row.dataset.username = u.username;
+
+    const avatar = document.createElement('div');
+    avatar.className = 'avatar';
+    avatar.textContent = initialsOf(u.displayName || u.username);
+
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    const pname = document.createElement('div');
+    pname.className = 'pname';
+    pname.textContent = u.displayName || u.username;
+    const puname = document.createElement('div');
+    puname.className = 'puname';
+    puname.textContent = '@' + u.username;
+    meta.append(pname, puname);
+
+    const status = document.createElement('span');
+    status.className = 'pstatus ' + (online ? 'on' : 'off');
+    const sdot = document.createElement('span'); sdot.className = 'pdot';
+    const label = document.createElement('span'); label.className = 'plabel';
+    label.textContent = online ? 'Đang hoạt động' : 'Ngoại tuyến';
+    status.append(sdot, label);
+
+    const actions = document.createElement('div');
+    actions.className = 'call-actions';
+
+    const audioBtn = document.createElement('button');
+    audioBtn.className = 'call-btn audio';
+    audioBtn.disabled = !online;
+    audioBtn.title = 'Gọi thoại';
+    audioBtn.innerHTML = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92Z"/></svg>';
+    audioBtn.onclick = () => Call.start(u.id, u.displayName || u.username, 'audio');
+
+    const videoBtn = document.createElement('button');
+    videoBtn.className = 'call-btn video';
+    videoBtn.disabled = !online;
+    videoBtn.title = 'Gọi video';
+    videoBtn.innerHTML = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8Z"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>';
+    videoBtn.onclick = () => Call.start(u.id, u.displayName || u.username, 'video');
+
+    actions.append(audioBtn, videoBtn);
+    row.append(avatar, meta, status, actions);
+    return row;
+  }
+
+  async function loadPeople() {
+    try {
+      const res = await Auth.apiFetch('/api/users');
+      if (res.status === 403) { Auth.logout(); return; }
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const people = await res.json();
+      peopleList.innerHTML = '';
+      if (!people.length) { peopleEmpty.style.display = ''; return; }
+      peopleEmpty.style.display = 'none';
+      const frag = document.createDocumentFragment();
+      people.forEach(u => frag.appendChild(personRow(u)));
+      peopleList.appendChild(frag);
+    } catch (err) {
+      peopleList.innerHTML = '';
+      peopleEmpty.style.display = '';
+      peopleEmpty.querySelector('h3').textContent = 'Không tải được danh sách';
+      peopleEmpty.querySelector('p').textContent = 'Có lỗi khi kết nối máy chủ. Hãy thử tải lại trang.';
+    }
+  }
+  // ----- Lịch sử cuộc gọi -----
+  const callLog = document.getElementById('callLog');
+  const callLogEmpty = document.getElementById('callLogEmpty');
+
+  function timeAgo(iso) {
+    if (!iso) return '';
+    const d = (Date.now() - new Date(iso).getTime()) / 1000;
+    if (d < 60) return 'vừa xong';
+    if (d < 3600) return Math.floor(d / 60) + ' phút trước';
+    if (d < 86400) return Math.floor(d / 3600) + ' giờ trước';
+    return Math.floor(d / 86400) + ' ngày trước';
+  }
+  function fmtDuration(s) {
+    if (!s) return '';
+    const m = Math.floor(s / 60), sec = s % 60;
+    return m > 0 ? `${m} phút ${sec}s` : `${sec}s`;
+  }
+  function statusText(c) {
+    if (c.status === 'MISSED')    return c.direction === 'incoming' ? 'Cuộc gọi nhỡ' : 'Không trả lời';
+    if (c.status === 'REJECTED')  return c.direction === 'incoming' ? 'Đã từ chối' : 'Bị từ chối';
+    if (c.status === 'COMPLETED') return fmtDuration(c.durationSeconds) || 'Đã kết thúc';
+    if (c.status === 'ONGOING')   return 'Đang gọi…';
+    return 'Đang đổ chuông…';
+  }
+
+  function logRow(c) {
+    const missed = c.status === 'MISSED' || c.status === 'REJECTED';
+    const row = document.createElement('div');
+    row.className = 'log-item';
+
+    const ic = document.createElement('div');
+    ic.className = 'log-icon' + (missed ? ' missed' : '');
+    ic.innerHTML = c.type === 'AUDIO'
+            ? '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92Z"/></svg>'
+            : '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8Z"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>';
+
+    const meta = document.createElement('div');
+    meta.className = 'log-meta';
+    const name = document.createElement('div');
+    name.className = 'log-name';
+    name.textContent = c.peerName || c.peerUsername || 'Người dùng';
+    const sub = document.createElement('div');
+    sub.className = 'log-sub' + (missed ? ' missed' : '');
+    sub.textContent = (c.direction === 'incoming' ? '↙ Đến' : '↗ Đi') + ' · ' + statusText(c);
+    meta.append(name, sub);
+
+    const time = document.createElement('div');
+    time.className = 'log-time';
+    time.textContent = timeAgo(c.createdAt);
+
+    row.append(ic, meta, time);
+    return row;
+  }
+
+  async function loadCallHistory() {
+    try {
+      const res = await Auth.apiFetch('/api/calls');
+      if (res.status === 403) { Auth.logout(); return; }
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const calls = await res.json();
+      callLog.innerHTML = '';
+      if (!calls.length) { callLogEmpty.style.display = ''; return; }
+      callLogEmpty.style.display = 'none';
+      const frag = document.createDocumentFragment();
+      calls.forEach(c => frag.appendChild(logRow(c)));
+      callLog.appendChild(frag);
+    } catch (e) { /* im lặng, không chặn trang */ }
+  }
+
+  loadPeople().then(() => {
+    Signaling.on('presence-snapshot', m => { onlinePeers.clear(); (m.online || []).forEach(id => onlinePeers.add(id)); refreshAllDots(); });
+    Signaling.on('presence', m => applyPresence(m.userId, m.online));
+    Call.init();
+    Call.setOnFinished(() => setTimeout(loadCallHistory, 500));   // làm mới lịch sử sau mỗi cuộc gọi
+    Signaling.connect();
+  });
+  loadCallHistory();
+</script>
+</body>
+</html>
