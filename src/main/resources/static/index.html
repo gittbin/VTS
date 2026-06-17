@@ -159,6 +159,15 @@
     .ctrl-btn.end { background: var(--danger); color: #fff; }
     .ctrl-btn.end svg { transform: rotate(135deg); }
     .ctrl-btn.end:hover { background: #ff6b62; }
+    .ctrl-btn:disabled { opacity: .4; cursor: not-allowed; }
+    .ctrl-btn.rec.active { background: var(--danger); color: #fff; }
+    .ctrl-btn.rec.active svg { animation: recpulse 1.2s ease-in-out infinite; }
+    @keyframes recpulse { 0%,100% { opacity: 1; } 50% { opacity: .45; } }
+    .rec-dot { display: none; align-items: center; gap: 6px; margin-top: 4px;
+      color: var(--danger); font-size: 12px; font-weight: 700; letter-spacing: .5px; }
+    .rec-dot.on { display: inline-flex; }
+    .rec-dot::before { content: ''; width: 9px; height: 9px; border-radius: 50%;
+      background: var(--danger); animation: recpulse 1.2s ease-in-out infinite; }
     .incoming-modal { position: fixed; inset: 0; z-index: 1100; display: none; align-items: center; justify-content: center; padding: 24px; background: rgba(10,8,6,0.6); backdrop-filter: blur(6px); }
     .incoming-modal.show { display: flex; animation: fade .2s ease both; }
     .incoming-card { background: linear-gradient(180deg, var(--surface), #1B1613); border: 1px solid var(--border); border-radius: 24px; padding: 34px 30px; text-align: center; width: 100%; max-width: 340px; box-shadow: 0 40px 90px -30px rgba(0,0,0,0.8); animation: rise .4s cubic-bezier(.2,.8,.2,1) both; }
@@ -185,6 +194,50 @@
     .log-sub { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
     .log-sub.missed { color: var(--danger); }
     .log-time { font-size: 12px; color: var(--text-dim); flex-shrink: 0; }
+
+    /* ===== Kết bạn ===== */
+    .add-friend { display: flex; gap: 10px; margin-bottom: 20px; }
+    .add-friend input {
+      flex: 1; padding: 12px 14px; background: var(--surface); color: var(--text);
+      border: 1px solid var(--border); border-radius: 11px; font-family: inherit; font-size: 14px;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .add-friend input::placeholder { color: #6A5D4F; }
+    .add-friend input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(255,122,92,0.15); }
+    .add-friend button {
+      padding: 0 22px; border: 0; border-radius: 11px; cursor: pointer; font-family: inherit;
+      font-weight: 700; font-size: 14px; color: #2A1206;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2)); transition: transform .15s;
+    }
+    .add-friend button:hover:not(:disabled) { transform: translateY(-2px); }
+    .add-friend button:disabled { opacity: .6; cursor: not-allowed; }
+    .search-result { margin: -8px 0 22px; }
+    .search-hint { color: var(--text-dim); font-size: 13px; padding: 6px 2px; }
+
+    .req-actions { display: flex; gap: 8px; flex-shrink: 0; }
+    .pill {
+      padding: 9px 15px; border-radius: 10px; cursor: pointer; font-family: inherit; font-weight: 600;
+      font-size: 13px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text);
+      transition: transform .15s, background .2s, color .2s, border-color .2s; white-space: nowrap;
+    }
+    .pill:hover:not(:disabled) { transform: translateY(-1px); }
+    .pill:disabled { opacity: .55; cursor: default; }
+    .pill.primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #2A1206; border: 0; }
+    .pill.danger { color: var(--danger); border-color: rgba(255,90,82,0.4); background: transparent; }
+    .pill.danger:hover:not(:disabled) { background: rgba(255,90,82,0.12); }
+    .call-btn.unfriend { background: var(--surface-2); color: var(--text-dim); border: 1px solid var(--border); }
+    .call-btn.unfriend:hover { color: var(--danger); border-color: rgba(255,90,82,0.5); }
+
+    /* ===== Toast ===== */
+    .toast {
+      position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%) translateY(20px); z-index: 1200;
+      background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+      padding: 12px 18px; border-radius: 12px; font-size: 14px; max-width: 90%;
+      box-shadow: 0 20px 50px -20px rgba(0,0,0,.7); opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .toast.error { border-color: rgba(255,90,82,0.5); color: #FF8C85; }
+    .toast.success { border-color: rgba(91,209,139,0.4); color: var(--ok); }
   </style>
 </head>
 <body>
@@ -212,20 +265,38 @@
     </div>
   </div>
 
-  <div class="section-title">Mọi người</div>
-  <p class="section-hint">Trạng thái trực tuyến sẽ cập nhật theo thời gian thực sau khi hoàn thiện phần signaling — hiện tại tạm hiển thị theo dữ liệu lần cuối.</p>
+  <!-- ===== Bạn bè ===== -->
+  <div class="section-title">Bạn bè</div>
+  <p class="section-hint">Trạng thái trực tuyến cập nhật theo thời gian thực. Chỉ gọi được bạn bè đang hoạt động (chấm xanh).</p>
 
-  <div id="peopleList" class="people-list"></div>
+  <div id="friendsList" class="people-list"></div>
 
-  <div id="peopleEmpty" class="empty" style="display:none">
+  <div id="friendsEmpty" class="empty" style="display:none">
     <div class="icon">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
       </svg>
     </div>
-    <h3>Chưa có ai khác ở đây</h3>
-    <p>Khi có thêm tài khoản đăng ký, mọi người sẽ xuất hiện ở đây. Rủ thêm bạn bè tạo tài khoản để thử gọi video nhé.</p>
+    <h3>Chưa có bạn bè nào</h3>
+    <p>Tìm theo username ở mục “Tìm &amp; thêm bạn” bên dưới để gửi lời mời kết bạn.</p>
   </div>
+
+  <!-- ===== Lời mời kết bạn đến ===== -->
+  <div class="section-title sub" id="incomingTitle" style="display:none; margin-top: 36px;">Lời mời kết bạn</div>
+  <div id="incomingList" class="people-list"></div>
+
+  <!-- ===== Lời mời đã gửi ===== -->
+  <div class="section-title sub" id="outgoingTitle" style="display:none; margin-top: 36px;">Lời mời đã gửi</div>
+  <div id="outgoingList" class="people-list"></div>
+
+  <!-- ===== Tìm & thêm bạn ===== -->
+  <div class="section-title" style="margin-top: 36px;">Tìm &amp; thêm bạn</div>
+  <div class="add-friend">
+    <input id="searchInput" placeholder="Nhập chính xác username…" autocomplete="off">
+    <button id="searchBtn">Tìm</button>
+  </div>
+  <div id="searchResult" class="search-result"></div>
+
   <div class="section-title" style="margin-top: 36px;">Lịch sử cuộc gọi</div>
   <div id="callLog" class="call-log"></div>
   <div id="callLogEmpty" class="empty" style="display:none">
@@ -253,47 +324,82 @@
   document.getElementById('selfName').textContent = me.displayName;
   document.getElementById('selfUname').textContent = '@' + me.username;
 
-  // ----- Danh sách "Mọi người" + online realtime + nút Gọi -----
-  const peopleList = document.getElementById('peopleList');
-  const peopleEmpty = document.getElementById('peopleEmpty');
-  const onlinePeers = new Set();
+  // ----- Mô hình bạn bè: danh sách bạn + lời mời + tìm kiếm -----
+  const friendsList   = document.getElementById('friendsList');
+  const friendsEmpty  = document.getElementById('friendsEmpty');
+  const incomingList  = document.getElementById('incomingList');
+  const incomingTitle = document.getElementById('incomingTitle');
+  const outgoingList  = document.getElementById('outgoingList');
+  const outgoingTitle = document.getElementById('outgoingTitle');
+  const searchInput   = document.getElementById('searchInput');
+  const searchBtn     = document.getElementById('searchBtn');
+  const searchResult  = document.getElementById('searchResult');
+  const onlinePeers   = new Set();
+
+  const ICON_AUDIO = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92Z"/></svg>';
+  const ICON_VIDEO = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8Z"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>';
+  const ICON_UNFRIEND = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="17" y1="8" x2="22" y2="13"/><line x1="22" y1="8" x2="17" y2="13"/></svg>';
+
+  // Toast nhỏ báo kết quả thao tác
+  let toastTimer = null;
+  function toast(msg, kind) {
+    let el = document.getElementById('toast');
+    if (!el) { el = document.createElement('div'); el.id = 'toast'; document.body.appendChild(el); }
+    el.className = 'toast ' + (kind || '');
+    el.textContent = msg;
+    void el.offsetWidth;                 // ép reflow để chạy transition
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+  }
+
+  // Gọi API thay đổi trạng thái; ném lỗi kèm message từ server
+  async function action(method, url, body) {
+    const opt = { method };
+    if (body !== undefined) opt.body = JSON.stringify(body);
+    const res = await Auth.apiFetch(url, opt);
+    let data = null; try { data = await res.json(); } catch (e) {}
+    if (!res.ok) throw new Error((data && data.message) || ('Lỗi ' + res.status));
+    return data;
+  }
 
   function paintDot(row, online) {
     const st = row.querySelector('.pstatus');
-    st.classList.toggle('on', online);
-    st.classList.toggle('off', !online);
-    row.querySelector('.plabel').textContent = online ? 'Đang hoạt động' : 'Ngoại tuyến';
-    row.querySelectorAll('.call-btn').forEach(b => b.disabled = !online);   // bật/tắt cả 2 nút gọi
+    if (st) { st.classList.toggle('on', online); st.classList.toggle('off', !online); }
+    const lbl = row.querySelector('.plabel');
+    if (lbl) lbl.textContent = online ? 'Đang hoạt động' : 'Ngoại tuyến';
+    // chỉ bật/tắt nút gọi — KHÔNG đụng nút huỷ kết bạn
+    row.querySelectorAll('.call-btn.audio, .call-btn.video').forEach(b => b.disabled = !online);
   }
-  function refreshAllDots() {
-    peopleList.querySelectorAll('.person').forEach(row => paintDot(row, onlinePeers.has(row.dataset.userId)));
+  function refreshFriendDots() {
+    friendsList.querySelectorAll('.person').forEach(row => paintDot(row, onlinePeers.has(row.dataset.userId)));
   }
   function applyPresence(userId, online) {
     if (online) onlinePeers.add(userId); else onlinePeers.delete(userId);
-    const row = peopleList.querySelector(`.person[data-user-id="${CSS.escape(userId)}"]`);
+    const row = friendsList.querySelector(`.person[data-user-id="${CSS.escape(userId)}"]`);
     if (row) paintDot(row, online);
   }
 
-  function personRow(u) {
-    const online = onlinePeers.has(u.id);
-    const row = document.createElement('div');
-    row.className = 'person';
-    row.dataset.userId = u.id;
-    row.dataset.username = u.username;
-
+  // Tạo phần avatar + tên (dùng chung cho mọi loại hàng)
+  function avatarMeta(name, username) {
     const avatar = document.createElement('div');
     avatar.className = 'avatar';
-    avatar.textContent = initialsOf(u.displayName || u.username);
-
+    avatar.textContent = initialsOf(name || username);
     const meta = document.createElement('div');
     meta.className = 'meta';
-    const pname = document.createElement('div');
-    pname.className = 'pname';
-    pname.textContent = u.displayName || u.username;
-    const puname = document.createElement('div');
-    puname.className = 'puname';
-    puname.textContent = '@' + u.username;
+    const pname = document.createElement('div'); pname.className = 'pname'; pname.textContent = name || username;
+    const puname = document.createElement('div'); puname.className = 'puname'; puname.textContent = '@' + username;
     meta.append(pname, puname);
+    return [avatar, meta];
+  }
+
+  function friendRow(f) {
+    const online = onlinePeers.has(f.id);
+    const row = document.createElement('div');
+    row.className = 'person';
+    row.dataset.userId = f.id;
+    row.dataset.username = f.username;
+    const [avatar, meta] = avatarMeta(f.displayName, f.username);
 
     const status = document.createElement('span');
     status.className = 'pstatus ' + (online ? 'on' : 'off');
@@ -304,45 +410,166 @@
 
     const actions = document.createElement('div');
     actions.className = 'call-actions';
+    const name = f.displayName || f.username;
 
     const audioBtn = document.createElement('button');
-    audioBtn.className = 'call-btn audio';
-    audioBtn.disabled = !online;
-    audioBtn.title = 'Gọi thoại';
-    audioBtn.innerHTML = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92Z"/></svg>';
-    audioBtn.onclick = () => Call.start(u.id, u.displayName || u.username, 'audio');
+    audioBtn.className = 'call-btn audio'; audioBtn.disabled = !online; audioBtn.title = 'Gọi thoại';
+    audioBtn.innerHTML = ICON_AUDIO;
+    audioBtn.onclick = () => Call.start(f.id, name, 'audio');
 
     const videoBtn = document.createElement('button');
-    videoBtn.className = 'call-btn video';
-    videoBtn.disabled = !online;
-    videoBtn.title = 'Gọi video';
-    videoBtn.innerHTML = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8Z"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>';
-    videoBtn.onclick = () => Call.start(u.id, u.displayName || u.username, 'video');
+    videoBtn.className = 'call-btn video'; videoBtn.disabled = !online; videoBtn.title = 'Gọi video';
+    videoBtn.innerHTML = ICON_VIDEO;
+    videoBtn.onclick = () => Call.start(f.id, name, 'video');
 
-    actions.append(audioBtn, videoBtn);
+    const unfBtn = document.createElement('button');
+    unfBtn.className = 'call-btn unfriend'; unfBtn.title = 'Huỷ kết bạn';
+    unfBtn.innerHTML = ICON_UNFRIEND;
+    unfBtn.onclick = () => unfriend(f.id, name);
+
+    actions.append(audioBtn, videoBtn, unfBtn);
     row.append(avatar, meta, status, actions);
     return row;
   }
 
-  async function loadPeople() {
+  function requestRow(r) {
+    const row = document.createElement('div');
+    row.className = 'person';
+    const [avatar, meta] = avatarMeta(r.displayName, r.username);
+    const actions = document.createElement('div');
+    actions.className = 'req-actions';
+
+    if (r.direction === 'incoming') {
+      const dec = document.createElement('button'); dec.className = 'pill'; dec.textContent = 'Từ chối';
+      dec.onclick = () => declineRequest(r.requestId);
+      const acc = document.createElement('button'); acc.className = 'pill primary'; acc.textContent = 'Chấp nhận';
+      acc.onclick = () => acceptRequest(r.requestId);
+      actions.append(dec, acc);
+    } else {
+      const can = document.createElement('button'); can.className = 'pill danger'; can.textContent = 'Huỷ';
+      can.onclick = () => cancelRequest(r.requestId);
+      actions.append(can);
+    }
+    row.append(avatar, meta, actions);
+    return row;
+  }
+
+  // ----- Loaders -----
+  async function loadFriends() {
     try {
-      const res = await Auth.apiFetch('/api/users');
+      const res = await Auth.apiFetch('/api/friends');
       if (res.status === 403) { Auth.logout(); return; }
       if (!res.ok) throw new Error('HTTP ' + res.status);
-      const people = await res.json();
-      peopleList.innerHTML = '';
-      if (!people.length) { peopleEmpty.style.display = ''; return; }
-      peopleEmpty.style.display = 'none';
-      const frag = document.createDocumentFragment();
-      people.forEach(u => frag.appendChild(personRow(u)));
-      peopleList.appendChild(frag);
+      const friends = await res.json();
+      friendsList.innerHTML = '';
+      if (!friends.length) {
+        friendsEmpty.style.display = '';
+      } else {
+        friendsEmpty.style.display = 'none';
+        const frag = document.createDocumentFragment();
+        friends.forEach(f => frag.appendChild(friendRow(f)));
+        friendsList.appendChild(frag);
+      }
+      refreshFriendDots();
     } catch (err) {
-      peopleList.innerHTML = '';
-      peopleEmpty.style.display = '';
-      peopleEmpty.querySelector('h3').textContent = 'Không tải được danh sách';
-      peopleEmpty.querySelector('p').textContent = 'Có lỗi khi kết nối máy chủ. Hãy thử tải lại trang.';
+      friendsList.innerHTML = '';
+      friendsEmpty.style.display = '';
+      friendsEmpty.querySelector('h3').textContent = 'Không tải được danh sách';
+      friendsEmpty.querySelector('p').textContent = 'Có lỗi khi kết nối máy chủ. Hãy thử tải lại trang.';
     }
   }
+
+  async function loadRequests(url, listEl, titleEl) {
+    try {
+      const res = await Auth.apiFetch(url);
+      if (res.status === 403) { Auth.logout(); return; }
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const reqs = await res.json();
+      listEl.innerHTML = '';
+      titleEl.style.display = reqs.length ? '' : 'none';
+      const frag = document.createDocumentFragment();
+      reqs.forEach(r => frag.appendChild(requestRow(r)));
+      listEl.appendChild(frag);
+    } catch (e) { listEl.innerHTML = ''; titleEl.style.display = 'none'; }
+  }
+  const loadIncoming = () => loadRequests('/api/friends/requests/incoming', incomingList, incomingTitle);
+  const loadOutgoing = () => loadRequests('/api/friends/requests/outgoing', outgoingList, outgoingTitle);
+
+  async function refreshLists() {
+    await Promise.all([loadFriends(), loadIncoming(), loadOutgoing()]);
+    Signaling.send({ type: 'get-presence' });   // đồng bộ lại chấm online (no-op nếu WS chưa mở)
+  }
+
+  // ----- Hành động -----
+  async function sendRequest(username) {
+    try {
+      const r = await action('POST', '/api/friends/requests', { username });
+      toast(r && r.status === 'ACCEPTED' ? 'Đã trở thành bạn bè 🎉' : 'Đã gửi lời mời kết bạn', 'success');
+      await refreshLists();
+      if (lastSearched) doSearch(lastSearched);
+    } catch (e) { toast(e.message, 'error'); }
+  }
+  async function acceptRequest(id) {
+    try { await action('POST', `/api/friends/requests/${id}/accept`); toast('Đã chấp nhận lời mời', 'success'); await refreshLists(); if (lastSearched) doSearch(lastSearched); }
+    catch (e) { toast(e.message, 'error'); await refreshLists(); }
+  }
+  async function declineRequest(id) {
+    try { await action('POST', `/api/friends/requests/${id}/decline`); toast('Đã từ chối lời mời'); await refreshLists(); }
+    catch (e) { toast(e.message, 'error'); await refreshLists(); }
+  }
+  async function cancelRequest(id) {
+    try { await action('DELETE', `/api/friends/requests/${id}`); toast('Đã huỷ lời mời'); await refreshLists(); }
+    catch (e) { toast(e.message, 'error'); await refreshLists(); }
+  }
+  async function unfriend(userId, name) {
+    if (!confirm(`Huỷ kết bạn với ${name}?`)) return;
+    try { await action('DELETE', `/api/friends/${userId}`); toast('Đã huỷ kết bạn'); await refreshLists(); if (lastSearched) doSearch(lastSearched); }
+    catch (e) { toast(e.message, 'error'); await refreshLists(); }
+  }
+
+  // ----- Tìm & thêm bạn -----
+  let lastSearched = '';
+  async function doSearch(username) {
+    const q = (username !== undefined ? username : searchInput.value).trim();
+    if (!q) { searchResult.innerHTML = ''; lastSearched = ''; return; }
+    lastSearched = q;
+    searchBtn.disabled = true;
+    try {
+      const res = await Auth.apiFetch('/api/users/search?username=' + encodeURIComponent(q));
+      if (res.status === 403) { Auth.logout(); return; }
+      if (res.status === 404) { searchHint('Không tìm thấy ai có username “' + q + '”.'); return; }
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      renderSearchResult(await res.json());
+    } catch (e) {
+      searchHint('Có lỗi khi tìm kiếm. Thử lại sau.');
+    } finally { searchBtn.disabled = false; }
+  }
+  function searchHint(text) {
+    searchResult.innerHTML = '';
+    const d = document.createElement('div'); d.className = 'search-hint'; d.textContent = text;
+    searchResult.appendChild(d);
+  }
+  function renderSearchResult(u) {
+    searchResult.innerHTML = '';
+    const row = document.createElement('div'); row.className = 'person';
+    const [avatar, meta] = avatarMeta(u.displayName, u.username);
+    const actions = document.createElement('div'); actions.className = 'req-actions';
+    const btn = document.createElement('button');
+    switch (u.relationship) {
+      case 'NONE':        btn.className = 'pill primary'; btn.textContent = 'Kết bạn';   btn.onclick = () => sendRequest(u.username); break;
+      case 'PENDING_IN':  btn.className = 'pill primary'; btn.textContent = 'Chấp nhận'; btn.onclick = () => sendRequest(u.username); break;
+      case 'PENDING_OUT': btn.className = 'pill'; btn.textContent = 'Đã gửi lời mời'; btn.disabled = true; break;
+      case 'FRIEND':      btn.className = 'pill'; btn.textContent = 'Đã là bạn bè';   btn.disabled = true; break;
+      case 'SELF':        btn.className = 'pill'; btn.textContent = 'Đây là bạn';     btn.disabled = true; break;
+      default:            btn.className = 'pill'; btn.textContent = '—';              btn.disabled = true;
+    }
+    actions.append(btn);
+    row.append(avatar, meta, actions);
+    searchResult.appendChild(row);
+  }
+
+  searchBtn.onclick = () => doSearch();
+  searchInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); doSearch(); } });
   // ----- Lịch sử cuộc gọi -----
   const callLog = document.getElementById('callLog');
   const callLogEmpty = document.getElementById('callLogEmpty');
@@ -412,8 +639,8 @@
     } catch (e) { /* im lặng, không chặn trang */ }
   }
 
-  loadPeople().then(() => {
-    Signaling.on('presence-snapshot', m => { onlinePeers.clear(); (m.online || []).forEach(id => onlinePeers.add(id)); refreshAllDots(); });
+  Promise.all([loadFriends(), loadIncoming(), loadOutgoing()]).then(() => {
+    Signaling.on('presence-snapshot', m => { onlinePeers.clear(); (m.online || []).forEach(id => onlinePeers.add(id)); refreshFriendDots(); });
     Signaling.on('presence', m => applyPresence(m.userId, m.online));
     Call.init();
     Call.setOnFinished(() => setTimeout(loadCallHistory, 500));   // làm mới lịch sử sau mỗi cuộc gọi

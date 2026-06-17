@@ -15,6 +15,14 @@ dbConn.call_history.createIndex({ callerId: 1 });
 dbConn.call_history.createIndex({ calleeId: 1 });
 dbConn.call_history.createIndex({ createdAt: -1 });
 
+// friendships — quan hệ bạn bè (mô hình friends-only)
+dbConn.createCollection('friendships');
+dbConn.friendships.createIndex({ pairKey: 1 }, { unique: true });   // mỗi cặp chỉ 1 bản ghi (chống trùng + race)
+dbConn.friendships.createIndex({ requesterId: 1 });
+dbConn.friendships.createIndex({ addresseeId: 1 });
+dbConn.friendships.createIndex({ requesterId: 1, status: 1 });
+dbConn.friendships.createIndex({ addresseeId: 1, status: 1 });
+
 // (tùy chọn) refresh_tokens — cho refresh token sau này; TTL tự xóa khi hết hạn
 // dbConn.createCollection('refresh_tokens');
 // dbConn.refresh_tokens.createIndex({ userId: 1 });

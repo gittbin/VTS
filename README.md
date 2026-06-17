@@ -5,8 +5,11 @@ VTS là ứng dụng gọi video/thoại trực tiếp 1-1 giữa hai người d
 ## Tính năng
 
 - Đăng ký / đăng nhập bằng **JWT** (mật khẩu băm BCrypt).
-- Danh sách người dùng kèm trạng thái **online/offline theo thời gian thực**.
+- **Kết bạn (friends-only)**: gửi/chấp nhận/từ chối/huỷ lời mời, huỷ kết bạn. **Chỉ thấy & chỉ gọi được bạn bè** — tìm người khác bằng **username chính xác** (không liệt kê toàn bộ user). Quyền được enforce ở cả REST lẫn signaling.
+- Trạng thái **online/offline theo thời gian thực**, **chỉ của bạn bè**.
 - Gọi **video** và gọi **thoại** 1-1 (tắt/bật mic, tắt/bật camera, kết thúc cuộc gọi).
+- **Chia sẻ màn hình** trong cuộc gọi video (`getDisplayMedia` + thay track, không cần renegotiate).
+- **Ghi cuộc gọi** phía client (`MediaRecorder`): video ghép màn hình đối phương + camera mình (PiP) và âm thanh 2 chiều; thoại thì ghi audio — bấm dừng là tự tải file `.webm` về.
 - **Lịch sử cuộc gọi**: gọi đi/đến, loại (video/thoại), trạng thái (hoàn thành / nhỡ / từ chối), thời lượng.
 
 ## Công nghệ
@@ -140,10 +143,18 @@ VTS/
 |---|---|---|---|
 | POST | `/api/auth/register` | Đăng ký (trả JWT) | Không |
 | POST | `/api/auth/login` | Đăng nhập (trả JWT) | Không |
-| GET | `/api/users` | Danh sách mọi người (trừ mình) | Bearer |
 | GET | `/api/users/me` | Thông tin của mình | Bearer |
+| GET | `/api/users/search?username=` | Tìm 1 người theo username chính xác (kèm quan hệ) | Bearer |
+| GET | `/api/friends` | Danh sách bạn bè (ACCEPTED) | Bearer |
+| GET | `/api/friends/requests/incoming` | Lời mời đến đang chờ | Bearer |
+| GET | `/api/friends/requests/outgoing` | Lời mời đã gửi đang chờ | Bearer |
+| POST | `/api/friends/requests` | Gửi lời mời `{username}` (auto-accept nếu chiều ngược đã tồn tại) | Bearer |
+| POST | `/api/friends/requests/{id}/accept` | Chấp nhận (chỉ người nhận) | Bearer |
+| POST | `/api/friends/requests/{id}/decline` | Từ chối (chỉ người nhận) | Bearer |
+| DELETE | `/api/friends/requests/{id}` | Huỷ lời mời đã gửi (chỉ người gửi) | Bearer |
+| DELETE | `/api/friends/{userId}` | Huỷ kết bạn | Bearer |
 | GET | `/api/calls` | Lịch sử cuộc gọi của mình | Bearer |
-| WS | `/ws?token=<JWT>` | Kênh signaling (presence + offer/answer/ICE) | Token qua query |
+| WS | `/ws?token=<JWT>` | Kênh signaling (presence bạn bè + offer/answer/ICE; gate quyền gọi) | Token qua query |
 
 ## Kiến trúc & quyết định thiết kế
 
@@ -162,8 +173,13 @@ VTS/
 - Thuộc tính Mongo đúng là **`spring.data.mongodb.uri`** (không phải `spring.mongodb.uri`).
 - Sửa file trong `src/main/resources/static/` thì **phải restart app** (hoặc build lại) để phục vụ bản mới; trình duyệt nhớ **hard refresh (Ctrl+Shift+R)** để bỏ cache JS.
 
-## Tính năng nâng cao (chưa làm — tùy chọn)
+## Tính năng nâng cao
 
-- **Chia sẻ màn hình** — `getDisplayMedia` + thay track (dễ nhất).
-- **Ghi hình cuộc gọi** — `MediaRecorder` phía client.
+Đã hoàn thành:
+
+- ✅ **Chia sẻ màn hình** — `getDisplayMedia` + `sender.replaceTrack` (không cần renegotiate).
+- ✅ **Ghi cuộc gọi** — `MediaRecorder` phía client: video ghép qua `<canvas>` (đối phương full + camera mình PiP) + trộn âm thanh 2 chiều bằng Web Audio; thoại ghi audio. Xuất file `.webm`, tự tải về khi dừng/cúp máy.
+
+Chưa làm (tùy chọn):
+
 - **Gọi nhóm** — mesh chỉ ~3–4 người; đông hơn cần SFU và sẽ phá vỡ mô hình thuần P2P.
