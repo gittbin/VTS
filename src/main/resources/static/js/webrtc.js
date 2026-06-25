@@ -185,6 +185,7 @@ const Call = (() => {
     // ---------- Caller ----------
     async function start(targetId, targetName, type) {
         if (state !== 'idle') return;
+        if (window.GroupCall && GroupCall.isBusy && GroupCall.isBusy()) { alert('Bạn đang trong cuộc gọi nhóm.'); return; }
         buildUI();
         role = 'caller'; peerId = targetId; peerName = targetName || 'Người dùng'; callType = type || 'video';
         callId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2));
@@ -211,6 +212,7 @@ const Call = (() => {
     }
 
     async function onAnswer(msg) {
+        if (msg.room) return;                       // bản tin của gọi nhóm → để GroupCall xử lý
         if (msg.from !== peerId || !pc) return;
         await pc.setRemoteDescription(msg.sdp);
         await drainCandidates();
@@ -218,7 +220,7 @@ const Call = (() => {
 
     // ---------- Callee ----------
     function onCallRequest(msg) {
-        if (state !== 'idle') {
+        if (state !== 'idle' || (window.GroupCall && GroupCall.isBusy && GroupCall.isBusy())) {
             Signaling.sendTo(msg.from, { type: 'call-reject', reason: 'busy', callId: msg.callId });
             return;
         }
@@ -244,6 +246,7 @@ const Call = (() => {
     }
 
     async function onOffer(msg) {
+        if (msg.room) return;                       // bản tin của gọi nhóm → để GroupCall xử lý
         if (msg.from !== peerId || !pc) return;
         await pc.setRemoteDescription(msg.sdp);
         await drainCandidates();
@@ -264,6 +267,7 @@ const Call = (() => {
 
     // ---------- Dùng chung ----------
     async function onIce(msg) {
+        if (msg.room) return;                       // bản tin của gọi nhóm → để GroupCall xử lý
         if (msg.from !== peerId || !msg.candidate) return;
         if (pc && pc.remoteDescription && pc.remoteDescription.type) {
             try { await pc.addIceCandidate(msg.candidate); } catch (e) {}
@@ -556,5 +560,5 @@ const Call = (() => {
         Signaling.on('peer-unavailable', onPeerUnavailable);
     }
 
-    return { init, start, setOnFinished: (fn) => { onFinished = fn; } };
+    return { init, start, setOnFinished: (fn) => { onFinished = fn; }, isBusy: () => state !== 'idle' };
 })();

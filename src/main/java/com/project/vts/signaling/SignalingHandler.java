@@ -13,6 +13,7 @@ import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -33,6 +34,11 @@ public class SignalingHandler extends TextWebSocketHandler {
 
     // Cặp (pairKey) đang trong cuộc gọi → cho relay tiếp dù có unfriend giữa chừng (THIET-KE §6.2, phương án B).
     private final Set<String> activeCallPairs = ConcurrentHashMap.newKeySet();
+
+    // ----- Gọi nhóm (full-mesh, tối đa MAX_GROUP người/phòng) -----
+    private static final int MAX_GROUP = 4;
+    private final Map<String, Set<String>> rooms = new ConcurrentHashMap<>();   // roomId -> userId thành viên
+    private final Map<String, String> userRoom = new ConcurrentHashMap<>();     // userId -> roomId đang ở
 
     public SignalingHandler(SessionRegistry registry, UserRepository userRepository,
                             ObjectMapper objectMapper, CallHistoryService callHistoryService,
@@ -78,6 +84,16 @@ public class SignalingHandler extends TextWebSocketHandler {
 
             if (fromUserId == null) return;
 
+            // ----- Bản tin điều khiển gọi nhóm -----
+            if (type instanceof String gt) {
+                switch (gt) {
+                    case "group-invite" -> { handleGroupInvite(session, fromUserId, msg); return; }
+                    case "group-join"   -> { handleGroupJoin(session, fromUserId, msg); return; }
+                    case "group-leave"  -> { leaveRoom(fromUserId, str(msg.get("roomId"))); return; }
+                    default -> { }
+                }
+            }
+
             Object to = msg.get("to");
             if (to instanceof String targetUserId) {
                 if (type instanceof String rt && RESERVED.contains(rt)) return;   // chặn giả mạo bản tin hệ thống
@@ -91,8 +107,9 @@ public class SignalingHandler extends TextWebSocketHandler {
                         sendJson(session, Map.of("type", "peer-unavailable", "to", targetUserId));
                         return;                                    // không phải bạn bè → không cho gọi
                     }
-                } else if (!active && !friendshipService.areFriends(fromUserId, targetUserId)) {
-                    return;                                        // người lạ & không trong cuộc gọi → bỏ qua
+                } else if (!active && !inSameRoom(fromUserId, targetUserId)
+                        && !friendshipService.areFriends(fromUserId, targetUserId)) {
+                    return;                          // người lạ, không cùng phòng & không trong cuộc gọi → bỏ qua
                 }
 
                 msg.put("from", fromUserId);
@@ -132,6 +149,7 @@ public class SignalingHandler extends TextWebSocketHandler {
         if (userId != null && !registry.isOnline(userId)) {
             callHistoryService.finalizeActiveForUser(userId);   // dọn cuộc gọi đang dở khi rớt mạng
             removeActivePairsOf(userId);                         // gỡ các cặp đang gọi liên quan
+            leaveRoom(userId, userRoom.get(userId));            // rời phòng nhóm (nếu đang ở) + báo người còn lại
             updatePresence(userId, false);
             sendPresenceToFriends(userId, false);                // báo offline chỉ cho bạn bè
         }
@@ -165,6 +183,107 @@ public class SignalingHandler extends TextWebSocketHandler {
     private void removeActivePairsOf(String userId) {
         activeCallPairs.removeIf(pk -> pk.startsWith(userId + "_") || pk.endsWith("_" + userId));
     }
+
+    // ----- Gọi nhóm -----
+
+    /** Host mời 1 người vào phòng. Host tự vào phòng ở lần mời đầu; chỉ mời được bạn bè; tôn trọng giới hạn. */
+    private void handleGroupInvite(WebSocketSession session, String fromUserId, Map<String, Object> msg) {
+        String roomId = str(msg.get("roomId"));
+        String to = str(msg.get("to"));
+        if (roomId == null || to == null) return;
+        if (!friendshipService.areFriends(fromUserId, to)) {
+            sendJson(session, Map.of("type", "peer-unavailable", "to", to));
+            return;
+        }
+        Set<String> room = rooms.computeIfAbsent(roomId, k -> ConcurrentHashMap.newKeySet());
+        synchronized (room) {
+            if (!room.contains(fromUserId)) {
+                if (room.size() >= MAX_GROUP) { sendJson(session, Map.of("type", "group-full", "roomId", roomId)); return; }
+                room.add(fromUserId);
+                userRoom.put(fromUserId, roomId);
+            }
+            if (room.size() >= MAX_GROUP) { sendJson(session, Map.of("type", "group-full", "roomId", roomId)); return; }
+        }
+
+        WebSocketSession target = registry.get(to);
+        if (target != null && target.isOpen()) {
+            String fromName = str(msg.get("fromName"));
+            String callType = "audio".equals(str(msg.get("callType"))) ? "audio" : "video";
+            sendJson(target, Map.of(
+                    "type", "group-invite", "roomId", roomId,
+                    "from", fromUserId,
+                    "fromName", fromName != null ? fromName : displayName(fromUserId),
+                    "callType", callType));
+        } else {
+            sendJson(session, Map.of("type", "peer-unavailable", "to", to));
+        }
+    }
+
+    /** Người được mời chấp nhận: thêm vào phòng, gửi danh sách thành viên cũ (để CHỜ offer),
+     *  báo thành viên cũ tạo offer tới người mới (quy ước "người cũ offer người mới" → tránh glare). */
+    private void handleGroupJoin(WebSocketSession session, String fromUserId, Map<String, Object> msg) {
+        String roomId = str(msg.get("roomId"));
+        if (roomId == null) return;
+        Set<String> room = rooms.get(roomId);
+        if (room == null) { sendJson(session, Map.of("type", "group-closed", "roomId", roomId)); return; }
+        // Khoá theo phòng → tránh race khi nhiều người join cùng lúc (đảm bảo mesh đủ cạnh).
+        synchronized (room) {
+            if (room.contains(fromUserId)) return;
+            if (room.size() >= MAX_GROUP) { sendJson(session, Map.of("type", "group-full", "roomId", roomId)); return; }
+
+            List<Map<String, Object>> peers = new ArrayList<>();
+            for (String uid : room) {
+                if (registry.isOnline(uid)) peers.add(Map.of("id", uid, "name", displayName(uid)));
+            }
+            room.add(fromUserId);
+            userRoom.put(fromUserId, roomId);
+
+            sendJson(session, Map.of("type", "group-joined", "roomId", roomId, "peers", peers));
+            String newName = displayName(fromUserId);
+            for (Map<String, Object> p : peers) {
+                WebSocketSession s = registry.get((String) p.get("id"));
+                if (s != null && s.isOpen())
+                    sendJson(s, Map.of("type", "group-peer-joined", "roomId", roomId,
+                            "peerId", fromUserId, "peerName", newName));
+            }
+        }
+    }
+
+    /** Rời phòng + báo những người còn lại đóng kết nối với mình; phòng trống thì xoá. */
+    private void leaveRoom(String userId, String roomId) {
+        if (userId == null) return;
+        if (roomId == null) roomId = userRoom.get(userId);
+        if (roomId == null) return;
+        userRoom.remove(userId, roomId);
+        Set<String> room = rooms.get(roomId);
+        if (room == null) return;
+        synchronized (room) {
+            room.remove(userId);
+            for (String uid : room) {
+                WebSocketSession s = registry.get(uid);
+                if (s != null && s.isOpen())
+                    sendJson(s, Map.of("type", "group-peer-left", "roomId", roomId, "peerId", userId));
+            }
+            if (room.isEmpty()) rooms.remove(roomId);
+        }
+    }
+
+    private boolean inSameRoom(String a, String b) {
+        String ra = userRoom.get(a), rb = userRoom.get(b);
+        return ra != null && ra.equals(rb);
+    }
+
+    private String displayName(String userId) {
+        if (userId == null) return "Người dùng";
+        try {
+            return userRepository.findById(userId)
+                    .map(u -> u.getDisplayName() != null && !u.getDisplayName().isBlank()
+                            ? u.getDisplayName() : u.getUsername())
+                    .orElse("Người dùng");
+        } catch (Exception e) { return "Người dùng"; }
+    }
+
+    private static String str(Object o) { return (o instanceof String s) ? s : null; }
 
     /** Ghi DB best-effort: online + lastSeen. RAM (registry) mới là nguồn chân lý. */
     private void updatePresence(String userId, boolean online) {

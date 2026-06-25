@@ -1,6 +1,6 @@
-# VTS — Ứng dụng gọi video & thoại 1-1 (WebRTC)
+# VTS — Ứng dụng gọi video & thoại (WebRTC)
 
-VTS là ứng dụng gọi video/thoại trực tiếp 1-1 giữa hai người dùng, chạy hoàn toàn trên trình duyệt bằng **WebRTC**. Backend Spring Boot lo xác thực, danh sách người dùng, signaling qua WebSocket và lưu lịch sử cuộc gọi; còn media (âm thanh/hình ảnh) đi **thẳng peer-to-peer** giữa hai trình duyệt.
+VTS là ứng dụng gọi video/thoại trên trình duyệt bằng **WebRTC** theo mô hình **chỉ-bạn-bè (friends-only)**: gọi **1-1** hoặc **nhóm (tối đa 4 người, full-mesh)**. Backend Spring Boot lo xác thực, kết bạn, signaling qua WebSocket và lưu lịch sử cuộc gọi; còn media (âm thanh/hình ảnh) đi **thẳng peer-to-peer** giữa các trình duyệt.
 
 ## Tính năng
 
@@ -8,6 +8,7 @@ VTS là ứng dụng gọi video/thoại trực tiếp 1-1 giữa hai người d
 - **Kết bạn (friends-only)**: gửi/chấp nhận/từ chối/huỷ lời mời, huỷ kết bạn. **Chỉ thấy & chỉ gọi được bạn bè** — tìm người khác bằng **username chính xác** (không liệt kê toàn bộ user). Quyền được enforce ở cả REST lẫn signaling.
 - Trạng thái **online/offline theo thời gian thực**, **chỉ của bạn bè**.
 - Gọi **video** và gọi **thoại** 1-1 (tắt/bật mic, tắt/bật camera, kết thúc cuộc gọi).
+- **Gọi nhóm (tối đa 4 người)** theo mô hình **full-mesh P2P**: chọn nhiều bạn → "Gọi nhóm" → lưới video nhiều người, tắt/bật mic-cam, rời nhóm.
 - **Chia sẻ màn hình** trong cuộc gọi video (`getDisplayMedia` + thay track, không cần renegotiate).
 - **Ghi cuộc gọi** phía client (`MediaRecorder`): video ghép màn hình đối phương + camera mình (PiP) và âm thanh 2 chiều; thoại thì ghi audio — bấm dừng là tự tải file `.webm` về.
 - **Lịch sử cuộc gọi**: gọi đi/đến, loại (video/thoại), trạng thái (hoàn thành / nhỡ / từ chối), thời lượng.
@@ -81,14 +82,36 @@ app.jwt.expiration-ms=86400000
   ./mvnw spring-boot:run
   ```
 
+## Cơ sở dữ liệu (MongoDB)
+
+Dữ liệu nằm trong **3 collection**. App đã bật `auto-index-creation` nên index tự tạo từ annotation `@Indexed`/`@Query`; script `scripts/mongo-init.js` dùng để **tạo thủ công / bàn giao** (idempotent — chạy lại không sao).
+
+| Collection | Vai trò | Index |
+|---|---|---|
+| `users` | Tài khoản người dùng (mật khẩu băm BCrypt, không bao giờ lưu plaintext) | `username` *(unique)*, `email` *(unique, sparse)* |
+| `call_history` | Lịch sử cuộc gọi **1-1** (RINGING/ONGOING/COMPLETED/MISSED/REJECTED) | `callerId`, `calleeId`, `createdAt` *(desc)* |
+| `friendships` | Quan hệ bạn bè (`PENDING` \| `ACCEPTED`) | `pairKey` *(unique)*, `requesterId`, `addresseeId`, `(requesterId,status)`, `(addresseeId,status)` |
+
+- **`friendships.pairKey`** = hai `userId` sắp xếp tăng dần rồi nối bằng `_` (vd `<idA>_<idB>`). Ràng buộc **unique** ⇒ mỗi cặp người dùng chỉ có **một** bản ghi ở mọi hướng → chống trùng + chống race khi hai người gửi lời mời cho nhau cùng lúc (bản ghi thứ hai đụng khoá → xử lý auto-accept).
+- **SDP/ICE và "phòng" gọi nhóm KHÔNG lưu DB** — chúng ephemeral, chỉ giữ trong RAM ở tầng signaling rồi bỏ.
+
+**Chạy script tạo collection + index:**
+
+```bash
+mongosh "<MONGODB_URI>" scripts/mongo-init.js
+```
+
+> Script mở DB bằng `db.getSiblingDB('vts')` — đổi `'vts'` cho khớp tên database trong connection string của bạn. Bỏ qua bước này cũng được vì app tự tạo index khi khởi động.
+
 ## Cách dùng / Demo
 
 1. Mở **http://localhost:8080** → tab **Đăng ký** → tạo tài khoản (đăng ký xong tự đăng nhập).
 2. Mở **trình duyệt thứ hai** (hoặc cửa sổ ẩn danh), đăng ký/đăng nhập tài khoản thứ hai.
-3. Ở trang chính, mục "Mọi người" hiện người kia với chấm xanh **Đang hoạt động**.
-4. Bấm nút **gọi video** hoặc **gọi thoại** → bên kia thấy cửa sổ gọi đến → **Trả lời**.
-5. Trong cuộc gọi: tắt/bật mic, tắt/bật camera, **Kết thúc**.
-6. Gọi xong, mục **Lịch sử cuộc gọi** tự cập nhật.
+3. Mục **Tìm & thêm bạn**: gõ username (hoặc tên hiển thị) của người kia → **Kết bạn**; bên kia vào mục **Lời mời kết bạn** → **Chấp nhận**.
+4. Hai người giờ thấy nhau ở mục **Bạn bè** với chấm xanh **Đang hoạt động**.
+5. Bấm **gọi video / gọi thoại** → bên kia thấy cửa sổ gọi đến → **Trả lời**. Trong cuộc gọi: tắt/bật mic-cam, chia sẻ màn hình, ghi cuộc gọi, **Kết thúc**.
+6. **Gọi nhóm:** tích chọn nhiều bạn đang online → thanh dưới hiện **Gọi video/thoại nhóm** (cần ≥3 tài khoản đã là bạn của người tạo nhóm).
+7. Gọi xong, mục **Lịch sử cuộc gọi** tự cập nhật (lịch sử ghi cho cuộc gọi 1-1).
 
 ## Lưu ý quan trọng khi test gọi video
 
@@ -105,37 +128,35 @@ app.jwt.expiration-ms=86400000
 VTS/
 ├── pom.xml
 ├── scripts/
-│   └── mongo-init.js                       # tạo collection + index (database script)
+│   └── mongo-init.js                       # tạo collection + index: users, call_history, friendships
 └── src/main/
     ├── java/com/project/vts/
     │   ├── VtsApplication.java
-    │   ├── config/
-    │   │   ├── SecurityConfig.java          # JWT stateless, phân quyền
-    │   │   └── WebSocketConfig.java         # đăng ký endpoint /ws
-    │   ├── controller/
-    │   │   ├── AuthController.java           # /api/auth/**
-    │   │   ├── UserController.java           # /api/users
-    │   │   └── CallHistoryController.java    # /api/calls
-    │   ├── dto/                              # request + response (đều là record)
-    │   ├── exception/                        # BadRequestException, GlobalExceptionHandler
-    │   ├── model/                            # User, CallHistory (@Document)
-    │   ├── repository/                       # MongoRepository
-    │   ├── security/                         # JwtService, JwtAuthenticationFilter, CustomUserDetailsService
-    │   ├── service/                          # AuthService, UserService, CallHistoryService
+    │   ├── config/                          # SecurityConfig, WebSocketConfig
+    │   ├── controller/                      # AuthController, UserController, FriendController, CallHistoryController
+    │   ├── dto/                             # request + response (đều là record)
+    │   ├── exception/                       # BadRequest/NotFound/Forbidden/Conflict + GlobalExceptionHandler
+    │   ├── model/                           # User, CallHistory, Friendship, FriendshipStatus
+    │   ├── repository/                      # UserRepository, CallHistoryRepository, FriendshipRepository
+    │   ├── security/                        # JwtService, JwtAuthenticationFilter, CustomUserDetailsService
+    │   ├── service/                         # AuthService, UserService, CallHistoryService, FriendshipService
     │   └── signaling/
-    │       ├── SessionRegistry.java          # userId -> WebSocketSession (NGUỒN CHÂN LÝ presence)
-    │       ├── SignalingHandler.java         # relay offer/answer/ICE + presence + ghi lịch sử
-    │       └── JwtHandshakeInterceptor.java  # xác thực token ở handshake
+    │       ├── SessionRegistry.java         # userId -> WebSocketSession (NGUỒN CHÂN LÝ presence)
+    │       ├── SignalingHandler.java        # relay offer/answer/ICE + presence + lịch sử + "phòng" gọi nhóm
+    │       └── JwtHandshakeInterceptor.java # xác thực token ở handshake
     └── resources/
         ├── application.properties
         └── static/
             ├── login.html
-            ├── index.html                    # danh sách + overlay cuộc gọi + lịch sử
+            ├── index.html                   # bạn bè / lời mời / tìm kiếm + overlay gọi 1-1 & nhóm + lịch sử
             └── js/
-                ├── auth.js                   # quản lý JWT, apiFetch
-                ├── signaling.js              # client WebSocket
-                └── webrtc.js                 # engine gọi (RTCPeerConnection)
+                ├── auth.js                  # quản lý JWT, apiFetch
+                ├── signaling.js             # client WebSocket
+                ├── webrtc.js                # engine gọi 1-1 + chia sẻ màn hình + ghi cuộc gọi
+                └── group.js                 # engine gọi nhóm full-mesh (tối đa 4)
 ```
+
+> Còn có `src/test/java/.../service/FriendshipServiceTest.java` — unit test máy trạng thái + phân quyền kết bạn.
 
 ## API
 
@@ -179,7 +200,9 @@ VTS/
 
 - ✅ **Chia sẻ màn hình** — `getDisplayMedia` + `sender.replaceTrack` (không cần renegotiate).
 - ✅ **Ghi cuộc gọi** — `MediaRecorder` phía client: video ghép qua `<canvas>` (đối phương full + camera mình PiP) + trộn âm thanh 2 chiều bằng Web Audio; thoại ghi audio. Xuất file `.webm`, tự tải về khi dừng/cúp máy.
+- ✅ **Gọi nhóm (tối đa 4 người)** — full-mesh P2P (mỗi cặp một `RTCPeerConnection`), "phòng" quản lý ở signaling (RAM). Quy ước "người cũ offer người mới" để tránh glare; chỉ mời được bạn bè, các thành viên trong phòng relay được với nhau. Engine ở `static/js/group.js`.
 
 Chưa làm (tùy chọn):
 
-- **Gọi nhóm** — mesh chỉ ~3–4 người; đông hơn cần SFU và sẽ phá vỡ mô hình thuần P2P.
+- **Gọi nhóm > 4 người** — cần **SFU** (vd mediasoup/Janus); full-mesh sẽ quá tải băng thông/CPU.
+- **Ghi hình / chia sẻ màn hình trong cuộc gọi nhóm**, và **lịch sử cuộc gọi nhóm** (hiện lịch sử chỉ ghi cuộc gọi 1-1).
