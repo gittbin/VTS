@@ -1,0 +1,34 @@
+# Kết quả build (sẽ build lại trong container)
+target/
+build/
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# IDE / editor
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.classpath
+.project
+.factorypath
+.apt_generated/
+.sts4-cache/
+
+# Git & metadata
+.git/
+.gitignore
+.gitattributes
+
+# Docker (không cần copy vào context build)
+Dockerfile
+.dockerignore
+docker-compose.yml
+.env
+
+# Tài liệu / khác
+HELP.md
+README.md
+*.log

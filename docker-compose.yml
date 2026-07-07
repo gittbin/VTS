@@ -1,0 +1,48 @@
+# docker-compose cho VTS
+#   docker compose up -d --build
+#
+# Mặc định chạy kèm MongoDB local (service "mongo"). Nếu muốn dùng MongoDB Atlas:
+#   - đặt MONGODB_URI trong .env trỏ tới Atlas
+#   - bỏ/không chạy service "mongo" (và xoá khối depends_on ở app)
+
+services:
+  mongo:
+    image: mongo:7
+    container_name: vts-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-root}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-example}
+      MONGO_INITDB_DATABASE: vts
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+      # Script tạo collection + index (chỉ chạy lần đầu khi volume còn trống).
+      - ./scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vts-app
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      # Ưu tiên MONGODB_URI trong .env (vd Atlas); nếu trống thì dùng mongo local ở trên.
+      MONGODB_URI: ${MONGODB_URI:-mongodb://${MONGO_ROOT_USER:-root}:${MONGO_ROOT_PASSWORD:-example}@mongo:27017/vts?authSource=admin}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET chua duoc dat - xem .env.example}
+      JAVA_OPTS: ${JAVA_OPTS:--Xms256m -Xmx512m}
+    ports:
+      - "8080:8080"
+
+volumes:
+  mongo-data:
